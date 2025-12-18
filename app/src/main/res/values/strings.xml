@@ -1,0 +1,121 @@
+<resources>
+    <string name="app_name">PubManager</string>
+
+
+    <string name="main_title">פרגולה</string>
+    <string name="events">אירועים</string>
+    <string name="families">משפחות</string>
+    <string name="products">פריטים</string>
+    <string name="emails">מיילים</string>
+
+    <string name="products_title">מוצרים</string>
+
+    <string name="back">חזור</string>
+    <string name="cancel">ביטול</string>
+    <string name="save">שמירה</string>
+    <string name="add_product">הוספת פריט</string>
+    <string name="name">שם</string>
+    <string name="price">מחיר</string>
+    <string name="update">עדכון</string>
+    <string name="delete">מחיקה</string>
+
+    <string name="yes">כן</string>
+    <string name="no">לא</string>
+
+
+    <!-- product -->
+    <string name="delete_product">מחיקת פריט</string>
+    <string name="are_you_sure_you_want_to_delete_the_product">האם אתה בטוח שברצונך למחוק את פריט </string>
+    <string name="product_added_successfully">הפריט נוסף בהצלחה</string>
+    <string name="the_product_was_successfully_updated">הפריט עודכן בהצלחה</string>
+    <string name="valid_name_and_price_must_be_filled_in">יש למלא שם ומחיר תקינים</string>
+    <string name="product_update">עדכון פריט</string>
+
+    <string name="no_product_selected_for_update">לא נבחר פריט לעדכון</string>
+    <string name="no_product_selected_for_delete">לא נבחר פריט למחיקה</string>
+    <string name="product_deleted_successfully">הפריט נמחק בהצלחה</string>
+
+    <!-- emails -->
+    <string name="emails_title">מיילים</string>
+    <string name="add_email">הוספת מייל</string>
+    <string name="email_address">מייל</string>
+    <string name="email_update">עדכון מייל</string>
+    <string name="email_updated_successfully">מייל עודכן בהצלחה</string>
+
+    <string name="invalid_email_address">כתובת המייל אינה תקינה</string>
+    <string name="valid_email_must_be_filled_in">יש למלא מייל תקין</string>
+    <string name="email_added_successfully">המייל נוסף בהצלחה</string>
+    <string name="email_was_successfully_updated">המייל עודכן בהצלחה</string>
+    <string name="email_deleted_successfully">המייל נמחק בהצלחה</string>
+
+    <string name="no_email_selected_for_update">לא נבחר מייל לעדכון</string>
+    <string name="no_email_selected_for_delete">לא נבחר מייל למחיקה</string>
+    <string name="delete_email">מחיקת מייל</string>
+    <string name="are_you_sure_you_want_to_delete_the_email">האם אתה בטוח שברצונך למחוק את המייל</string>
+
+    <!-- families -->
+    <string name="families_title">משפחות</string>
+    <string name="add_family">הוספת משפחה</string>
+    <string name="family_update">עדכון משפחה</string>
+    <string name="first_name">שם פרטי</string>
+    <string name="last_name">שם משפחה</string>
+    <string name="delete_family">מחיקת משפחה</string>
+    <string name="are_you_sure_you_want_to_delete_the_family">האם אתה בטוח שברצונך למחוק את המשפחה</string>
+
+    <string name="no_family_selected_for_update">לא נבחרה משפחה לעדכון</string>
+    <string name="no_family_selected_for_delete">לא נבחרה משפחה למחיקה</string>
+
+    <string name="family_added_successfully">המשפחה נוספה בהצלחה</string>
+    <string name="family_updated_successfully">המשפחה עודכנה בהצלחה</string>
+    <string name="family_deleted_successfully">המשפחה נמחקה בהצלחה</string>
+
+    <string name="valid_first_and_last_name_must_be_filled_in">יש למלא שם פרטי ושם משפחה</string>
+
+    <!-- events -->
+    <string name="events_title">אירועים</string>
+    <string name="add_event">הוסף אירוע</string>
+    <string name="event_update">עדכון אירוע</string>
+    <string name="event_name">שם אירוע</string>
+    <string name="event_date">תאריך (DD-MM-YYYY)</string>
+    <string name="delete_event">מחיקת אירוע</string>
+    <string name="are_you_sure_you_want_to_delete_the_event">האם אתה בטוח שברצונך למחוק את האירוע</string>
+    <string name="no_event_selected_for_update">לא נבחר אירוע לעדכון</string>
+    <string name="no_event_selected_for_delete">לא נבחר אירוע למחיקה</string>
+    <string name="event_added_successfully">האירוע נוסף בהצלחה</string>
+    <string name="event_updated_successfully">האירוע עודכן בהצלחה</string>
+    <string name="event_deleted_successfully">האירוע נמחק בהצלחה</string>
+    <string name="valid_event_name_and_date_required">חובה למלא שם אירוע ותאריך תקף</string>
+
+
+    <!-- orders -->
+    <string name="orders_title">הזמנות</string>
+    <string name="add_order">הוספת הזמנה</string>
+    <string name="order_update">עדכון הזמנה</string>
+    <string name="search_family">חיפוש משפחה</string>
+    <string name="items">פריטים</string>
+    <string name="family">משפחה</string>
+    <string name="total">סה״כ</string>
+    <string name="send">שליחה</string>
+
+    <string name="delete_order">מחיקת הזמנה</string>
+    <string name="are_you_sure_you_want_to_delete_the_order">האם אתה בטוח שברצונך למחוק את ההזמנה של</string>
+
+    <string name="no_order_selected_for_update">לא נבחרה הזמנה לעדכון</string>
+    <string name="no_order_selected_for_delete">לא נבחרה הזמנה למחיקה</string>
+
+    <string name="no_family_selected">לא נבחרה משפחה</string>
+    <string name="pick_at_least_one_item">בחר לפחות פריט אחד עם כמות גדולה מ-0</string>
+    <string name="order_deleted">ההזמנה נמחקה</string>
+    <string name="order_update_successfully">ההזמנה עודכנה בהצלחה</string>
+
+    <string name="family_unknown_format">Family #%1$d</string>
+    <string name="family_full_name_format">%1$s %2$s</string>
+    <string name="minus">-</string>
+    <string name="plus">+</string>
+    <string name="grand_total_label">סה״&quot;כ:</string>
+    <string name="no_emails">אין מיילים</string>
+    <string name="no_items">אין פריטים</string>
+    <string name="close">סגור</string>
+    <string name="delete_order_question_with_name">%1$s &quot;%2$s&quot;?</string>
+
+</resources>

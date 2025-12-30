@@ -11,6 +11,8 @@ import com.example.pubmanager.ui.products.ProductUi
 fun OrdersRoute(
     viewModel: OrdersViewModel,
     eventId: Long,
+    eventName: String,
+    eventDateText: String,
     families: List<FamilyUi>,
     products: List<ProductUi>,
     onBackClick: () -> Unit
@@ -24,15 +26,15 @@ fun OrdersRoute(
     }
 
     OrdersScreen(
-        orders = orders,
         eventId = eventId,
+        eventName = eventName,
+        eventDateText = eventDateText,
+
         families = families,
         products = products,
+        orders = orders,
 
         emails = emails,
-        onSendEmails = { selectedEmails ->
-
-        },
 
         onBackClick = onBackClick,
 
@@ -46,6 +48,20 @@ fun OrdersRoute(
 
         onDeleteOrder = { familyId ->
             viewModel.deleteFamilyOrder(eventId, familyId)
+        },
+
+        onSendSelectedEmails = { toEmails, excelBytes, attachmentName, subject, text,onResult ->
+            viewModel.sendEmailToSelected(
+                toEmails = toEmails,
+                excelBytes = excelBytes,
+                attachmentName = attachmentName,
+                subject = subject,
+                text = text
+            ) { msg ->
+                onResult(msg)
+            }
         }
     )
 }
+
+

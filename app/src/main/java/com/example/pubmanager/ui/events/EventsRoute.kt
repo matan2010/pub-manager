@@ -1,14 +1,19 @@
 package com.example.pubmanager.ui.events
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import java.time.format.DateTimeFormatter
+
+private val EVENT_DATE_FORMATTER =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
 @Composable
 fun EventsRoute(
     viewModel: EventsViewModel,
     onBackClick: () -> Unit,
-    onOpenOrder: (Long) -> Unit
+    onOpenOrder: (eventId: Long, eventName: String, eventDate: java.time.LocalDate) -> Unit
 ) {
     val events by viewModel.events.collectAsState()
 
@@ -24,8 +29,10 @@ fun EventsRoute(
         onDeleteEventClick = { id ->
             viewModel.deleteEvent(id)
         },
-        onOpenOrder = { eventId ->
-            onOpenOrder(eventId)
+        onOpenOrder = { eventId, eventName, eventDate ->
+            onOpenOrder(eventId, eventName, eventDate)  // ✅ רק מעביר הלאה
         }
+
+
     )
 }

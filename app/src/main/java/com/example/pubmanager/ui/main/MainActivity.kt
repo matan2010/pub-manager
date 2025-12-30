@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             PubManagerTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    AppNavigation()
+                     AppNavigation()
                 }
             }
         }

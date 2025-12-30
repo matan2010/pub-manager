@@ -41,6 +41,15 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES"
+            )
+        }
+    }
+
+
 }
 
 dependencies {
@@ -75,4 +84,13 @@ dependencies {
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     implementation("androidx.compose.material:material-icons-extended")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+
+    implementation("com.google.api-client:google-api-client-android:1.32.1")
+    implementation("com.google.apis:google-api-services-drive:v3-rev20211107-1.32.1")
+    implementation("com.google.http-client:google-http-client-gson:1.43.3")
+    implementation("com.google.http-client:google-http-client-android:1.43.3")
 }

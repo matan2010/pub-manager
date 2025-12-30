@@ -55,7 +55,7 @@ fun EventsScreen(
     onSaveNewEvent: (String, LocalDate) -> Unit,
     onUpdateEvent: (Long, String, LocalDate) -> Unit,
     onDeleteEventClick: (Long) -> Unit,
-    onOpenOrder: (Long) -> Unit
+    onOpenOrder: (eventId: Long, eventName: String, eventDateText: LocalDate) -> Unit
 ) {
     var isAdding by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
@@ -366,7 +366,11 @@ fun EventsScreen(
                     .pointerInput(event.id) {
                         detectTapGestures(
                             onTap = { onClick() },
-                            onDoubleTap = { onOpenOrder(event.id) }
+                            onDoubleTap = { onOpenOrder(
+                                event.id,
+                                event.name,
+                                event.date
+                            ) }
                         )
                     }
                     .padding(vertical = 8.dp, horizontal = 4.dp),

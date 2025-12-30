@@ -1,5 +1,6 @@
 package com.example.pubmanager.ui.main
 
+import android.net.Uri
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -19,9 +20,14 @@ import com.example.pubmanager.ui.orders.OrdersRoute
 import com.example.pubmanager.ui.orders.OrdersViewModel
 import com.example.pubmanager.ui.products.ProductsRoute
 import com.example.pubmanager.ui.products.ProductsViewModel
+import java.time.format.DateTimeFormatter
+
+private val EVENT_DATE_FORMATTER =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
 @Composable
 fun AppNavigation() {
+
     val navController = rememberNavController()
 
     Surface(color = MaterialTheme.colorScheme.background) {
@@ -53,8 +59,14 @@ fun AppNavigation() {
                 EventsRoute(
                     viewModel = viewModel,
                     onBackClick = { navController.popBackStack() },
-                    onOpenOrder = { eventId -> navController.navigate("order/$eventId") }
-                )
+                  //  onOpenOrder = { eventId -> navController.navigate("order/$eventId") }
+                    onOpenOrder = { eventId, eventName, eventDate ->
+                        val nameEnc = Uri.encode(eventName)
+                        val dateEnc = Uri.encode(eventDate.format(EVENT_DATE_FORMATTER))
+                        navController.navigate("order/$eventId?name=$nameEnc&date=$dateEnc")
+                    }
+
+                    )
             }
 
             composable("families") {
@@ -82,12 +94,20 @@ fun AppNavigation() {
                 )
             }
 
-            composable("order/{eventId}") { backStackEntry ->
+            composable("order/{eventId}?name={name}&date={date}") { backStackEntry ->
                 val eventId = backStackEntry.arguments
                     ?.getString("eventId")
                     ?.toLong() ?: return@composable
 
-                val viewModel: OrdersViewModel = hiltViewModel()
+                val eventName = backStackEntry.arguments
+                    ?.getString("name")
+                    ?.let { Uri.decode(it) }
+                    ?: "אירוע"
+
+                val eventDateTextRaw = backStackEntry.arguments
+                    ?.getString("date")
+                    ?.let { Uri.decode(it) }
+                    ?: ""
 
                 val ordersVm: OrdersViewModel = hiltViewModel()
                 val familiesVm: FamiliesViewModel = hiltViewModel()
@@ -99,6 +119,8 @@ fun AppNavigation() {
                 OrdersRoute(
                     viewModel = ordersVm,
                     eventId = eventId,
+                    eventName = eventName,
+                    eventDateText = eventDateTextRaw,
                     families = families,
                     products = products,
                     onBackClick = { navController.popBackStack() }

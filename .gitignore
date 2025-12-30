@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Email config
+app/src/main/java/com/example/pubmanager/ui/emails/EmailConfig.kt

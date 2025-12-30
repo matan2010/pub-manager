@@ -57,12 +57,20 @@ import androidx.compose.ui.unit.sp
 import com.example.pubmanager.R
 import com.example.pubmanager.ui.common.CrudScaffold
 import com.example.pubmanager.ui.common.HasId
+import com.example.pubmanager.ui.common.isOnline
 import com.example.pubmanager.ui.emails.EmailUi
 import com.example.pubmanager.ui.families.FamilyUi
 import com.example.pubmanager.ui.orders.OrderUi
 import com.example.pubmanager.ui.products.ProductUi
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import java.math.BigDecimal
+import java.math.RoundingMode
+import com.example.pubmanager.drive.DriveUploader
+import java.io.File as JavaFile
 
 private data class OrderRowUi(
     override val id: Long,
@@ -75,17 +83,26 @@ private data class OrderRowUi(
 @Composable
 fun OrdersScreen(
     eventId: Long,
+    eventName: String,
+    eventDateText: String,
     families: List<FamilyUi>,
     products: List<ProductUi>,
     orders: List<OrderUi>,
     emails: List<EmailUi> = emptyList(),
-    onSendEmails: (selected: List<EmailUi>) -> Unit = {},
     onBackClick: () -> Unit,
     onSaveNewOrder: (familyId: Long, quantitiesToAdd: Map<Long, Int>) -> Unit,
     onUpdateOrder: (familyId: Long, quantitiesSet: Map<Long, Int>) -> Unit,
     onDeleteOrder: (familyId: Long) -> Unit,
     onSendClick: () -> Unit = {},
-    onItemsClick: () -> Unit = {}
+    onItemsClick: () -> Unit = {},
+    onSendSelectedEmails: (
+        toEmails: List<String>,
+        excelBytes: ByteArray,
+        attachmentName: String,
+        subject: String,
+        text: String,
+        onResult: (String) -> Unit
+    ) -> Unit = { _, _, _, _, _, _-> }
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -125,11 +142,21 @@ fun OrdersScreen(
     val txtNoItems = stringResource(R.string.no_items)
     val txtGrandTotalLabel = stringResource(R.string.grand_total_label)
 
+    val msgSubjectEmail = stringResource(R.string.subject_email)
+    val msgTextEmail = stringResource(R.string.text_email)
+
+    val msgNoInternetConnection = stringResource(R.string.no_internet_connection)
+    val msgNoValidEmailsWereSelected = stringResource(R.string.no_valid_emails_were_selected)
+
+    val msgUploadedToDrive = stringResource(R.string.uploaded_to_drive)
+    val msgSending = stringResource(R.string.sending)
+
     val familyById = remember(families) { families.associateBy { it.id } }
     val productById = remember(products) { products.associateBy { it.id } }
 
     val productsScrollState = rememberScrollState()
 
+    val folderId = "14JuWiFFXZA0GZf6MbLAEiO0yn3zI-2pb"
     val productColWidth = 92.dp
 
     val totalWeight = 0.8f
@@ -154,12 +181,10 @@ fun OrdersScreen(
                 val qty = familyOrders.firstOrNull { it.productId == p.id }?.quantity ?: 0
                 p.id to qty
             }
-
             val total = quantities.entries.sumOf { (pid, qty) ->
                 val price = productById[pid]?.price ?: 0.0
                 price * qty
             }
-
             OrderRowUi(
                 id = familyId,
                 familyId = familyId,
@@ -178,7 +203,11 @@ fun OrdersScreen(
         )
     }
 
-    val grandTotal = remember(orderRows) { orderRows.sumOf { it.total } }
+    val grandTotal = remember(orderRows) {
+        BigDecimal.valueOf(orderRows.sumOf { it.total })
+            .setScale(1, RoundingMode.HALF_UP)
+            .toDouble()
+    }
 
     var selectedFamilyId by remember { mutableStateOf<Long?>(null) }
 
@@ -247,6 +276,7 @@ fun OrdersScreen(
 
     var showEmailsDialog by remember { mutableStateOf(false) }
     var showProductsDialog by remember { mutableStateOf(false) }
+    var isSending by remember { mutableStateOf(false) }
 
     val selectedEmailMap = remember { mutableStateMapOf<Long, Boolean>() }
 
@@ -266,7 +296,7 @@ fun OrdersScreen(
             .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
     ) {
         CrudScaffold(
-            title = "$txtTitle      |      $txtGrandTotalLabel $grandTotal",
+            title = "$eventName      $eventDateText          |       $txtTitle       |                $txtGrandTotalLabel $grandTotal",
             onBackClick = onBackClick,
             items = orderRows,
             selectedId = selectedFamilyId,
@@ -808,15 +838,99 @@ fun OrdersScreen(
                 },
                 confirmButton = {
                     val sendColor = if (canSendEmails) Color(0xFF43A047) else Color(0xFF9E9E9E)
+
                     Button(
                         onClick = {
-                            val selected = emails.filter { selectedEmailMap[it.id] == true }
-                            onSendEmails(selected)
-                            showEmailsDialog = false
+                            if (isSending) return@Button
+
+                            isSending = true
+
+                            if (!isOnline(context)) {
+                                isSending = false
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = msgNoInternetConnection,
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                                return@Button
+                            }
+
+                            val toEmails = emails
+                                .filter { selectedEmailMap[it.id] == true }
+                                .map { it.email.trim() }
+                                .filter { it.isNotBlank() }
+                                .distinct()
+
+                            if (toEmails.isEmpty()) {
+                                isSending = false
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = msgNoValidEmailsWereSelected,
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                                return@Button
+                            }
+
+                            val attachmentName = buildExcelFileName(eventName, eventDateText)
+                            val excelBytes = createOrdersXlsxBytes(
+                                eventId = eventId,
+                                eventName = eventName,
+                                eventDateText = eventDateText,
+                                products = products,
+                                orderRows = orderRows,
+                                grandTotal = grandTotal,
+                                sentToEmails = toEmails
+                            )
+
+                            val xlsxFile = JavaFile(context.cacheDir, attachmentName)
+                            xlsxFile.writeBytes(excelBytes)
+
+                            scope.launch {
+                                try {
+                                    val driveId = DriveUploader.uploadFile(
+                                        context = context,
+                                        localFile = xlsxFile,
+                                        mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        driveFileName = attachmentName,
+                                        folderId = folderId
+                                    )
+
+                                    snackbarHostState.showSnackbar(
+                                        message = msgUploadedToDrive,
+                                        duration = SnackbarDuration.Short
+                                    )
+
+                                    showEmailsDialog = false
+                                    onSendSelectedEmails(
+                                        toEmails,
+                                        excelBytes,
+                                        attachmentName,
+                                        msgSubjectEmail,
+                                        msgTextEmail
+                                    ) { msg ->
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(message = msg,
+                                                actionLabel = txtClose,
+                                                duration = SnackbarDuration.Long)
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Send failed: ${e.message ?: "unknown error"}",
+                                        duration = SnackbarDuration.Long
+                                    )
+                                } finally {
+                                    isSending = false
+                                }
+                            }
                         },
-                        enabled = canSendEmails,
+                        enabled = canSendEmails && !isSending,
                         colors = ButtonDefaults.buttonColors(containerColor = sendColor)
-                    ) { Text(txtSend) }
+                    ) {
+                        Text(if (isSending) msgSending else txtSend)
+                    }
                 },
                 dismissButton = {
                     Button(onClick = { showEmailsDialog = false }) { Text(txtCancel) }
@@ -868,4 +982,360 @@ fun OrdersScreen(
             )
         }
     }
+}
+
+private fun round1(d: Double): Double =
+    BigDecimal.valueOf(d).setScale(1, RoundingMode.HALF_UP).toDouble()
+
+
+
+/* =========================================================================================
+   Excel helpers
+   ========================================================================================= */
+
+private fun buildExcelFileName(eventName: String, eventDateText: String): String {
+    val safeName = sanitizeFileName(eventName).ifBlank { "אירוע" }
+    val safeDate = sanitizeFileName(eventDateText).ifBlank { "" }
+    val base = if (safeDate.isNotBlank()) "${safeName}_$safeDate" else safeName
+    return "$base.xlsx"
+}
+
+private fun sanitizeFileName(s: String): String {
+    val trimmed = s.trim()
+    if (trimmed.isBlank()) return ""
+    return trimmed
+        .replace(Regex("""[\\/:*?"<>|]"""), "-")
+        .replace(Regex("""\s+"""), "_")
+        .take(80)
+}
+
+private fun sanitizeSheetName(name: String): String {
+    val cleaned = name.trim()
+        .replace(Regex("""[:\\/?*\[\]]"""), " ")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+    return cleaned.take(31)
+}
+
+private fun colToLetters(col1Based: Int): String {
+    var n = col1Based
+    val sb = StringBuilder()
+    while (n > 0) {
+        val rem = (n - 1) % 26
+        sb.append(('A'.code + rem).toChar())
+        n = (n - 1) / 26
+    }
+    return sb.reverse().toString()
+}
+
+private fun xmlEscape(s: String): String {
+    return s
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
+}
+
+private fun formatDoubleForXml(d: Double): String {
+    return String.format(Locale.US, "%.2f", d)
+}
+
+private fun createOrdersXlsxBytes(
+    eventId: Long,
+    eventName: String,
+    eventDateText: String,
+    products: List<ProductUi>,
+    orderRows: List<OrderRowUi>,
+    grandTotal: Double,
+    sentToEmails: List<String>
+): ByteArray {
+    val baos = ByteArrayOutputStream()
+    ZipOutputStream(baos).use { zip ->
+
+        fun put(path: String, content: String) {
+            zip.putNextEntry(ZipEntry(path))
+            zip.write(content.toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+        }
+
+        val sheetXml = buildSheetXml(
+            eventId = eventId,
+            eventName = eventName,
+            eventDateText = eventDateText,
+            products = products,
+            orderRows = orderRows,
+            grandTotal = grandTotal,
+            sentToEmails = sentToEmails
+        )
+
+        val stylesXml = buildStylesXml()
+
+        put(
+            "[Content_Types].xml",
+            """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+              <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+              <Default Extension="xml" ContentType="application/xml"/>
+              <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+              <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+              <!-- ✅ חדש -->
+              <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+            </Types>
+            """.trimIndent()
+        )
+
+        put(
+            "_rels/.rels",
+            """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1"
+                Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+                Target="xl/workbook.xml"/>
+            </Relationships>
+            """.trimIndent()
+        )
+
+        val sheetNameSafe = sanitizeSheetName(eventName).ifBlank { "אירוע" }
+
+        put(
+            "xl/workbook.xml",
+            """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <sheets>
+                <sheet name="$sheetNameSafe" sheetId="1" r:id="rId1"/>
+              </sheets>
+            </workbook>
+            """.trimIndent()
+        )
+
+        put(
+            "xl/_rels/workbook.xml.rels",
+            """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1"
+                Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+                Target="worksheets/sheet1.xml"/>
+              <!-- ✅ חדש -->
+              <Relationship Id="rId2"
+                Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"
+                Target="styles.xml"/>
+            </Relationships>
+            """.trimIndent()
+        )
+
+        put("xl/styles.xml", stylesXml)
+
+        put("xl/worksheets/sheet1.xml", sheetXml)
+    }
+
+    return baos.toByteArray()
+}
+
+private fun buildStylesXml(): String {
+    return """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <fonts count="2">
+            <font/>
+            <font><b/></font>
+          </fonts>
+
+          <fills count="6">
+            <fill><patternFill patternType="none"/></fill>
+            <fill><patternFill patternType="gray125"/></fill>
+
+            <!-- 2: תכלת -->
+            <fill><patternFill patternType="solid"><fgColor rgb="FFCCFFFF"/></patternFill></fill>
+            <!-- 3: ירקרק -->
+            <fill><patternFill patternType="solid"><fgColor rgb="FFCCFFCC"/></patternFill></fill>
+            <!-- 4: צהוב -->
+            <fill><patternFill patternType="solid"><fgColor rgb="FFFFFF99"/></patternFill></fill>
+            <!-- 5: כתום -->
+            <fill><patternFill patternType="solid"><fgColor rgb="FFFFCC99"/></patternFill></fill>
+          </fills>
+
+          <borders count="1">
+            <border/>
+          </borders>
+
+          <cellXfs count="10">
+            <xf fontId="0" fillId="0" borderId="0"/>                                  <!-- 0 רגיל -->
+            <xf fontId="1" fillId="0" borderId="0" applyFont="1"/>                    <!-- 1 Bold -->
+
+            <xf fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1"/>      <!-- 2 Bold + תכלת -->
+            <xf fontId="1" fillId="3" borderId="0" applyFont="1" applyFill="1"/>      <!-- 3 Bold + ירקרק -->
+            <xf fontId="1" fillId="4" borderId="0" applyFont="1" applyFill="1"/>      <!-- 4 Bold + צהוב -->
+            <xf fontId="1" fillId="5" borderId="0" applyFont="1" applyFill="1"/>      <!-- 5 Bold + כתום -->
+
+            <xf fontId="0" fillId="2" borderId="0" applyFill="1"/>                    <!-- 6 תכלת -->
+            <xf fontId="0" fillId="3" borderId="0" applyFill="1"/>                    <!-- 7 ירקרק -->
+            <xf fontId="0" fillId="4" borderId="0" applyFill="1"/>                    <!-- 8 צהוב -->
+            <xf fontId="0" fillId="5" borderId="0" applyFill="1"/>                    <!-- 9 כתום -->
+          </cellXfs>
+        </styleSheet>
+    """.trimIndent()
+}
+
+private fun buildSheetXml(
+    eventId: Long,
+    eventName: String,
+    eventDateText: String,
+    products: List<ProductUi>,
+    orderRows: List<OrderRowUi>,
+    grandTotal: Double,
+    sentToEmails: List<String>
+): String {
+    val headers = buildList {
+        add("משפחה")
+        products.forEach { add(it.name) }
+        add("סה״כ")
+    }
+
+    val sideStartCol = headers.size + 2
+
+    val itemsStartCol = sideStartCol + 2
+
+    val rowsXml = StringBuilder()
+
+    fun cellRef(colIndex1Based: Int, rowIndex1Based: Int): String =
+        "${colToLetters(colIndex1Based)}$rowIndex1Based"
+
+    fun inlineStrCell(r: String, value: String, style: Int = 0): String {
+        val safe = xmlEscape(value)
+        return """<c r="$r" s="$style" t="inlineStr"><is><t>$safe</t></is></c>"""
+    }
+
+    fun numberCell(r: String, value: String, style: Int = 0): String {
+        return """<c r="$r" s="$style"><v>$value</v></c>"""
+    }
+
+    fun appendSideCells(cells: StringBuilder, rowIdx: Int) {
+        val sideIndex = rowIdx - 2
+
+        val email = sentToEmails.getOrNull(sideIndex)
+        if (!email.isNullOrBlank()) {
+            cells.append(inlineStrCell(cellRef(sideStartCol, rowIdx), email, 6))
+        }
+
+        val p = products.getOrNull(sideIndex)
+        if (p != null) {
+            cells.append(inlineStrCell(cellRef(itemsStartCol, rowIdx), p.name, 6))
+            cells.append(numberCell(cellRef(itemsStartCol + 1, rowIdx), formatDoubleForXml(p.price), 6))
+        }
+    }
+
+    var rowIdx = 1
+
+    run {
+        val cells = StringBuilder()
+        cells.append(inlineStrCell(cellRef(1, rowIdx), "אירוע", 2))
+        cells.append(inlineStrCell(cellRef(2, rowIdx), "תאריך", 2))
+
+        cells.append(inlineStrCell(cellRef(sideStartCol, rowIdx), "מיילים", 2))
+        cells.append(inlineStrCell(cellRef(itemsStartCol, rowIdx), "פריטים", 2))
+        cells.append(inlineStrCell(cellRef(itemsStartCol + 1, rowIdx), "מחירים", 2))
+
+        rowsXml.append("""<row r="$rowIdx">$cells</row>""")
+        rowIdx++
+    }
+
+    run {
+        val cells = StringBuilder()
+        cells.append(inlineStrCell(cellRef(1, rowIdx), eventName, 6))
+        cells.append(inlineStrCell(cellRef(2, rowIdx), eventDateText, 6))
+
+        appendSideCells(cells, rowIdx)
+
+        rowsXml.append("""<row r="$rowIdx">$cells</row>""")
+        rowIdx++
+    }
+
+    run {
+        val cells = StringBuilder()
+        appendSideCells(cells, rowIdx)
+        rowsXml.append("""<row r="$rowIdx">$cells</row>""")
+        rowIdx++
+    }
+
+    run {
+        val cells = StringBuilder()
+
+        headers.forEachIndexed { i, h ->
+            val col = i + 1
+            val style = when (col) {
+                1 -> 3
+                headers.size -> 4
+                else -> 2
+            }
+            cells.append(inlineStrCell(cellRef(col, rowIdx), h, style))
+        }
+
+        appendSideCells(cells, rowIdx)
+        rowsXml.append("""<row r="$rowIdx">$cells</row>""")
+        rowIdx++
+    }
+
+    orderRows.forEach { row ->
+        val cells = StringBuilder()
+
+        cells.append(inlineStrCell(cellRef(1, rowIdx), row.familyFullName, 7))
+
+        products.forEachIndexed { i, p ->
+            val qty = row.quantitiesByProduct[p.id] ?: 0
+            cells.append(numberCell(cellRef(2 + i, rowIdx), qty.toString(), 6))
+        }
+
+        cells.append(numberCell(cellRef(headers.size, rowIdx), formatDoubleForXml(row.total), 8))
+
+        appendSideCells(cells, rowIdx)
+
+        rowsXml.append("""<row r="$rowIdx">$cells</row>""")
+        rowIdx++
+    }
+
+    run {
+        val cells = StringBuilder()
+
+        cells.append(inlineStrCell(cellRef(1, rowIdx), "סה״כ כללי", 5))
+
+        if (headers.size > 2) {
+            for (c in 2 until headers.size) {
+                cells.append(inlineStrCell(cellRef(c, rowIdx), "", 9))
+            }
+        }
+
+        cells.append(numberCell(cellRef(headers.size, rowIdx), formatDoubleForXml(grandTotal), 5))
+
+        appendSideCells(cells, rowIdx)
+
+        rowsXml.append("""<row r="$rowIdx">$cells</row>""")
+        rowIdx++
+    }
+
+    val neededSideRows = maxOf(sentToEmails.size, products.size) + 1
+    while (rowIdx <= neededSideRows) {
+        val cells = StringBuilder()
+        appendSideCells(cells, rowIdx)
+        rowsXml.append("""<row r="$rowIdx">$cells</row>""")
+        rowIdx++
+    }
+
+    return """
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+          <sheetViews>
+            <sheetView rightToLeft="1"/>
+          </sheetViews>
+
+          <sheetData>
+            $rowsXml
+          </sheetData>
+        </worksheet>
+    """.trimIndent()
 }

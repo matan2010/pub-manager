@@ -43,7 +43,6 @@ fun EmailsScreen(
     onSaveNewEmail: (String) -> Unit,
     onUpdateEmail: (Long, String) -> Unit,
     onDeleteEmailClick: (Long) -> Unit,
-    onSendEmailClick: () -> Unit
 ) {
     var isAdding by remember { mutableStateOf(false) }
     var newEmail by remember { mutableStateOf("") }
@@ -341,4 +340,3 @@ fun EmailsScreen(
         }
     )
 }
-

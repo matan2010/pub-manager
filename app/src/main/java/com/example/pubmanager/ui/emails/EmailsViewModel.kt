@@ -33,19 +33,14 @@ class EmailsViewModel @Inject constructor(
 
     fun addEmail(address: String) {
         viewModelScope.launch {
-            val email = Email(email = address)
-            repository.insertEmail(email)
+            repository.insertEmail(Email(email = address))
             loadEmails()
         }
     }
 
     fun updateEmail(id: Long, address: String) {
         viewModelScope.launch {
-            val email = Email(
-                id = id,
-                email = address
-            )
-            repository.updateEmail(email)
+            repository.updateEmail(Email(id = id, email = address))
             loadEmails()
         }
     }
@@ -53,11 +48,7 @@ class EmailsViewModel @Inject constructor(
     fun deleteEmail(id: Long) {
         viewModelScope.launch {
             val uiEmail = _emails.value.firstOrNull { it.id == id } ?: return@launch
-            val entity = Email(
-                id = uiEmail.id,
-                email = uiEmail.email
-            )
-            repository.deleteEmail(entity)
+            repository.deleteEmail(Email(id = uiEmail.id, email = uiEmail.email))
             loadEmails()
         }
     }

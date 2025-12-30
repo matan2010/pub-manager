@@ -117,5 +117,19 @@
     <string name="no_items">אין פריטים</string>
     <string name="close">סגור</string>
     <string name="delete_order_question_with_name">%1$s &quot;%2$s&quot;?</string>
+    <string name="no_internet">אין חיבור לאינטרנט</string>
+    <string name="need_at_least_one_email">חייב להיות לפחות מייל אחד כדי לשלוח</string>
+
+
+    <!--send email -->
+    <string name="subject_email">דו"ח מהפרגולה</string>
+    <string name="text_email">מצורף קובץ אקסל עבור דוח תשלום</string>
+
+    <string name="no_internet_connection">אין חיבור לאינטרנט</string>
+    <string name="no_valid_emails_were_selected">לא נבחרו מיילים תקינים</string>
+
+    <string name="uploaded_to_drive">✅ הועלה ל-Drive</string>
+
+    <string name="sending">שולח...</string>
 
 </resources>

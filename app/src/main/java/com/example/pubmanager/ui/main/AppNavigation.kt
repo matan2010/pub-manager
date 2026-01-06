@@ -20,15 +20,28 @@ import com.example.pubmanager.ui.orders.OrdersRoute
 import com.example.pubmanager.ui.orders.OrdersViewModel
 import com.example.pubmanager.ui.products.ProductsRoute
 import com.example.pubmanager.ui.products.ProductsViewModel
+import com.example.pubmanager.ui.update.UpdateScreen
 import java.time.format.DateTimeFormatter
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.LaunchedEffect
+import com.example.pubmanager.ui.common.rememberIsOnline
+import com.example.pubmanager.ui.update.UpdateViewModel
 
 private val EVENT_DATE_FORMATTER =
     DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
 @Composable
 fun AppNavigation() {
-
     val navController = rememberNavController()
+
+    val updateVm: UpdateViewModel = viewModel()
+    val updateState by updateVm.state.collectAsState()
+
+    val isOnline by rememberIsOnline()
+
+    LaunchedEffect(Unit) {
+        if (isOnline) updateVm.checkOnly()
+    }
 
     Surface(color = MaterialTheme.colorScheme.background) {
 
@@ -50,7 +63,13 @@ fun AppNavigation() {
                     },
                     onEmailsClick = {
                         navController.navigate("emails")
-                    }
+                    },
+                    onUpdateClick = {
+                        navController.navigate("update")
+                                    },
+                    updateEnabled = updateState.updateAvailable,
+                    updateBusy = updateState.isBusy,
+                    isOnline = isOnline
                 )
             }
 
@@ -59,14 +78,13 @@ fun AppNavigation() {
                 EventsRoute(
                     viewModel = viewModel,
                     onBackClick = { navController.popBackStack() },
-                  //  onOpenOrder = { eventId -> navController.navigate("order/$eventId") }
                     onOpenOrder = { eventId, eventName, eventDate ->
                         val nameEnc = Uri.encode(eventName)
                         val dateEnc = Uri.encode(eventDate.format(EVENT_DATE_FORMATTER))
                         navController.navigate("order/$eventId?name=$nameEnc&date=$dateEnc")
                     }
 
-                    )
+                )
             }
 
             composable("families") {
@@ -125,6 +143,10 @@ fun AppNavigation() {
                     products = products,
                     onBackClick = { navController.popBackStack() }
                 )
+            }
+
+            composable("update") {
+                UpdateScreen(vm = updateVm, onClose = { navController.popBackStack() })
             }
         }
     }

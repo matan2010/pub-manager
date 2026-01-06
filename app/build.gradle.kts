@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,24 +8,39 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
+}
+
 android {
     namespace = "com.example.pubmanager"
     compileSdk {
         version = release(36)
     }
 
-    defaultConfig {
-        applicationId = "com.example.pubmanager"
-        minSdk = 24
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        defaultConfig {
+            applicationId = "com.example.pubmanager"
+            minSdk = 24
+            targetSdk = 36
+            versionCode = 1
+            versionName = "1.0.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+            testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file(localProps["RELEASE_STORE_FILE"] as String)
+            storePassword = localProps["RELEASE_STORE_PASSWORD"] as String
+            keyAlias = localProps["RELEASE_KEY_ALIAS"] as String
+            keyPassword = localProps["RELEASE_KEY_PASSWORD"] as String
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -31,6 +48,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -40,6 +58,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
@@ -93,4 +112,8 @@ dependencies {
     implementation("com.google.apis:google-api-services-drive:v3-rev20211107-1.32.1")
     implementation("com.google.http-client:google-http-client-gson:1.43.3")
     implementation("com.google.http-client:google-http-client-android:1.43.3")
+
+
+
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
 }

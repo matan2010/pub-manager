@@ -2,6 +2,8 @@ package com.example.pubmanager.drive
 
 import android.content.Context
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.Scope
 import com.google.api.client.extensions.android.http.AndroidHttp
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.http.FileContent
@@ -106,4 +108,14 @@ object DriveUploader {
 
         result.files?.firstOrNull()?.id
     }
+
+
+    fun  getDriveSignInClient(context: Context) =
+        GoogleSignIn.getClient(
+            context,
+            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestScopes(Scope(DriveScopes.DRIVE_FILE))
+                .build()
+        )
 }

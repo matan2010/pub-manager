@@ -4,8 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -13,14 +17,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.example.pubmanager.R
 import androidx.compose.ui.AbsoluteAlignment
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
     onEventsClick: () -> Unit = {},
     onFamiliesClick: () -> Unit = {},
     onProductsClick: () -> Unit = {},
-    onEmailsClick: () -> Unit = {}
+    onEmailsClick: () -> Unit = {},
+    onUpdateClick: () -> Unit = {},
+    updateEnabled: Boolean = false,
+    updateBusy: Boolean = false,
+    isOnline: Boolean = true
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
@@ -28,6 +39,10 @@ fun HomeScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 32.dp, vertical = 24.dp)
     ) {
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
         Text(
             text = stringResource(R.string.main_title),
             style = MaterialTheme.typography.headlineLarge,
@@ -71,6 +86,18 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(text = stringResource(R.string.emails))
+            }
+
+            val showUpdate = isOnline && updateEnabled
+
+            if (showUpdate) {
+                Button(
+                    onClick = onUpdateClick,
+                    enabled = !updateBusy,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = stringResource(R.string.update))
+                }
             }
         }
     }

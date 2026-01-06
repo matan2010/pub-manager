@@ -1,5 +1,7 @@
 package com.example.pubmanager.ui.orders
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -72,6 +74,9 @@ import java.math.RoundingMode
 import com.example.pubmanager.drive.DriveUploader
 import java.io.File as JavaFile
 
+import com.google.android.gms.auth.api.signin.GoogleSignIn // ✅ חדש
+import com.google.android.gms.common.api.ApiException // ✅ חדש
+
 private data class OrderRowUi(
     override val id: Long,
     val familyId: Long,
@@ -102,7 +107,7 @@ fun OrdersScreen(
         subject: String,
         text: String,
         onResult: (String) -> Unit
-    ) -> Unit = { _, _, _, _, _, _-> }
+    ) -> Unit = { _, _, _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -276,7 +281,33 @@ fun OrdersScreen(
 
     var showEmailsDialog by remember { mutableStateOf(false) }
     var showProductsDialog by remember { mutableStateOf(false) }
+
     var isSending by remember { mutableStateOf(false) }
+
+    var pendingDriveUpload by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
+
+    val signInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            task.getResult(ApiException::class.java)
+
+            val cont = pendingDriveUpload
+            if (cont != null) {
+                scope.launch { cont() }
+            }
+        } catch (e: Exception) {
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    message = "Google sign-in failed: ${e.message ?: "unknown"}",
+                    duration = SnackbarDuration.Long
+                )
+            }
+            isSending = false
+            pendingDriveUpload = null
+        }
+    }
 
     val selectedEmailMap = remember { mutableStateMapOf<Long, Boolean>() }
 
@@ -842,7 +873,6 @@ fun OrdersScreen(
                     Button(
                         onClick = {
                             if (isSending) return@Button
-
                             isSending = true
 
                             if (!isOnline(context)) {
@@ -887,9 +917,9 @@ fun OrdersScreen(
                             val xlsxFile = JavaFile(context.cacheDir, attachmentName)
                             xlsxFile.writeBytes(excelBytes)
 
-                            scope.launch {
+                            val doUploadAndSend: suspend () -> Unit = {
                                 try {
-                                    val driveId = DriveUploader.uploadFile(
+                                    DriveUploader.uploadFile(
                                         context = context,
                                         localFile = xlsxFile,
                                         mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -911,9 +941,11 @@ fun OrdersScreen(
                                         msgTextEmail
                                     ) { msg ->
                                         scope.launch {
-                                            snackbarHostState.showSnackbar(message = msg,
+                                            snackbarHostState.showSnackbar(
+                                                message = msg,
                                                 actionLabel = txtClose,
-                                                duration = SnackbarDuration.Long)
+                                                duration = SnackbarDuration.Long
+                                            )
                                         }
                                     }
                                 } catch (e: Exception) {
@@ -923,7 +955,18 @@ fun OrdersScreen(
                                     )
                                 } finally {
                                     isSending = false
+                                    pendingDriveUpload = null
                                 }
+                            }
+
+                            // ✅ חדש: אם אין חשבון מחובר - עושים sign-in ואז ממשיכים
+                            val account = GoogleSignIn.getLastSignedInAccount(context)
+                            if (account == null) {
+                                pendingDriveUpload = doUploadAndSend
+                                val intent = DriveUploader.getDriveSignInClient(context).signInIntent
+                                signInLauncher.launch(intent)
+                            } else {
+                                scope.launch { doUploadAndSend() }
                             }
                         },
                         enabled = canSendEmails && !isSending,
@@ -986,8 +1029,6 @@ fun OrdersScreen(
 
 private fun round1(d: Double): Double =
     BigDecimal.valueOf(d).setScale(1, RoundingMode.HALF_UP).toDouble()
-
-
 
 /* =========================================================================================
    Excel helpers
